@@ -1,0 +1,8 @@
+flask
+python-dotenv
+requests
+streamlit
+solana
+pandas
+numpy
+argparse
