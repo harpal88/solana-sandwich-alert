@@ -51,10 +51,7 @@ The **Solana Sandwich Attack Detector** is a web-based tool designed to analyze 
    http://localhost:5000
    ```
 
-3. Alternatively, run the Streamlit interface:
-   ```bash
-   streamlit run app.py
-   ```
+
 
 ### Usage
 
