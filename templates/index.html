@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solana Sandwich Attack Detector</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #9945FF; /* Solana purple */
+            --secondary-color: #14F195; /* Solana green */
+            --dark-color: #1A1A2E;
+            --light-color: #F8F9FA;
+        }
+        
+        body {
+            background-color: #f5f5f5;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .navbar-brand {
+            font-weight: 700;
+            color: var(--primary-color) !important;
+        }
+        
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border: none;
+            margin-bottom: 20px;
+        }
+        
+        .card-header {
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 10px 10px 0 0 !important;
+            font-weight: 600;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        
+        .btn-primary:hover {
+            background-color: #7a36cc;
+            border-color: #7a36cc;
+        }
+        
+        .btn-outline-primary {
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        
+        .btn-outline-primary:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .solana-gradient {
+            background: linear-gradient(261deg, var(--primary-color), var(--secondary-color), #ffffff61);            color: white;
+        }
+        
+        .transaction-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .attack-indicator {
+            animation: pulse 2s infinite;
+        }
+        /* Add to your existing styles */
+.transaction-card {
+    transition: all 0.2s ease;
+}
+
+.transaction-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+}
+
+.attack-transaction {
+    border-left: 4px solid #dc3545;
+}
+
+.badge-attack {
+    background-color: #dc3545;
+    animation: pulse 1.5s infinite;
+}
+
+.tx-direction-buy {
+    color: #28a745;
+}
+
+.tx-direction-sell {
+    color: #dc3545;
+}
+
+@keyframes pulse {
+    0% { opacity: 0.8; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.05); }
+    100% { opacity: 0.8; transform: scale(1); }
+}
+        @keyframes pulse {
+            0% { opacity: 0.8; }
+            50% { opacity: 1; }
+            100% { opacity: 0.8; }
+        }
+        
+        .logo {
+            height: 40px;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark solana-gradient mb-4">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="#">
+                <img src="https://solana.com/src/img/branding/solanaLogoMark.svg" alt="Solana Logo" class="logo">
+                Sandwich Attack Detector
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#">Home</a>
+                    </li>
+                   
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Token Analysis</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="analysisForm">
+                            <div class="row g-3">
+                                <div class="col-md-8">
+                                    <label for="tokenAddress" class="form-label">Token Address</label>
+                                    <input type="text" class="form-control" id="tokenAddress" placeholder="Enter Solana token address" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="lookbackLimit" class="form-label">Transactions to Analyze</label>
+                                    <input type="number" class="form-control" id="lookbackLimit" min="10" max="1000" value="100">
+                                </div>
+                                <div class="col-12">
+                                    <button type="submit" class="btn btn-primary" id="analyzeBtn">
+                                        <span id="analyzeText">Analyze Token</span>
+                                        <span id="analyzeSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Analysis Results</h5>
+                        <span class="badge bg-secondary" id="resultsCount">0 transactions analyzed</span>
+                    </div>
+                    <div class="card-body">
+                        <div id="loadingIndicator" class="text-center py-4 d-none">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Analyzing transactions...</p>
+                        </div>
+                        <div id="resultsContainer" class="d-none">
+                            <div class="alert alert-success" id="successAlert" style="display: none;">
+                                <strong>Analysis complete!</strong> <span id="resultsSummary"></span>
+                            </div>
+                            <div class="alert alert-danger attack-indicator" id="attackAlert" style="display: none;">
+                                <strong>Sandwich Attack Detected!</strong> <span id="attackDetails"></span>
+                            </div>
+                            <div class="transaction-list mt-3" id="transactionList">
+                                <!-- Transaction items will be added here dynamically -->
+                            </div>
+                        </div>
+                        <div id="noResults" class="text-center py-4">
+                            <p>Enter a token address and click "Analyze Token" to begin.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">About Sandwich Attacks</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Sandwich attacks are a type of front-running where an attacker places orders both before and after a victim's transaction to profit from price movements.</p>
+                        <h6 class="mt-3">Common Patterns:</h6>
+                        <ul class="list-group list-group-flush mb-3">
+                            <li class="list-group-item">Buy → Victim Buy → Sell</li>
+                            <li class="list-group-item">Sell → Victim Sell → Buy</li>
+                        </ul>
+                        <a href="#" class="btn btn-outline-primary btn-sm">Learn More</a>
+                    </div>
+                </div>
+                
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Recent Analyses</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="list-group" id="recentAnalyses">
+                            <a href="#" class="list-group-item list-group-item-action">SRM: 2 attacks found</a>
+                            <a href="#" class="list-group-item list-group-item-action">RAY: No attacks</a>
+                            <a href="#" class="list-group-item list-group-item-action">SOL: 1 attack found</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="mt-5 py-4 bg-light">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="mb-0">© 2025 Solana Sandwich Attack Detector</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <a href="#" class="text-decoration-none me-3">Privacy Policy</a>
+                    <a href="#" class="text-decoration-none">Terms of Service</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    // Simple check for DEX interaction (you might want to enhance this)
+function is_dex_interaction(txDetails) {
+    if (!txDetails || !txDetails.instructions) return false;
+    // This is a simplified check - you should compare against your DEX_PROGRAM_IDS
+    return txDetails.instructions.some(ix => 
+        ix.programId && ix.programId.includes('swap') || ix.programId.includes('dex')
+    );
+}
+    
+    
+    document.getElementById('analysisForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const tokenAddress = document.getElementById('tokenAddress').value.trim();
+        const lookbackLimit = document.getElementById('lookbackLimit').value;
+        
+        if (!tokenAddress) {
+            alert('Please enter a valid token address');
+            return;
+        }
+        
+        // Show loading state
+        toggleLoading(true);
+        
+        try {
+            const response = await fetch('/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tokenAddress: tokenAddress,
+                    lookbackLimit: lookbackLimit
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.status === 'error') {
+                throw new Error(data.message);
+            }
+            
+            displayResults(data);
+            
+        } catch (error) {
+            console.error('Error:', error);
+            showError(error.message);
+        } finally {
+            toggleLoading(false);
+        }
+    });
+    
+// Update your displayResults function
+function displayResults(data) {
+    const resultsContainer = document.getElementById('resultsContainer');
+    resultsContainer.classList.remove('d-none');
+    
+    // Update stats
+    document.getElementById('resultsCount').textContent = 
+        `${data.stats.totalTransactions} transactions analyzed`;
+    
+    // Show alerts based on results
+    const successAlert = document.getElementById('successAlert');
+    const attackAlert = document.getElementById('attackAlert');
+    
+    if (data.stats.potentialAttacks > 0) {
+        successAlert.style.display = 'none';
+        attackAlert.style.display = 'block';
+        attackAlert.innerHTML = `
+            <strong>⚠️ ${data.stats.potentialAttacks} Potential Sandwich Attacks Detected!</strong>
+            <div class="mt-2">
+                ${data.potentialSandwiches.map(attack => `
+                    <div class="mb-2">
+                        <strong>${attack.type.replace('-', ' → ')}</strong><br>
+                        <small>Time between: ${attack.timeDiffs[0]}s and ${attack.timeDiffs[1]}s</small>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    } else {
+        successAlert.style.display = 'block';
+        attackAlert.style.display = 'none';
+        document.getElementById('resultsSummary').textContent = 
+            `Analyzed ${data.stats.totalTransactions} transactions with ${data.stats.dexTransactions} DEX interactions.`;
+    }
+    
+    // Update transaction list with enhanced visualization
+    updateTransactionList(data.transactions, data.potentialSandwiches);
+}
+
+function updateTransactionList(transactions, attacks) {
+    const listElement = document.getElementById('transactionList');
+    listElement.innerHTML = '';
+    
+    if (!transactions.length) {
+        listElement.innerHTML = '<div class="text-center py-3">No transactions found</div>';
+        return;
+    }
+    
+    // Get all attack transaction signatures for highlighting
+    const attackSignatures = new Set();
+    attacks.forEach(attack => {
+        attack.transactions.forEach(tx => attackSignatures.add(tx.signature));
+    });
+    
+    transactions.forEach(tx => {
+        const isAttack = attackSignatures.has(tx.signature);
+        const txElement = document.createElement('div');
+        txElement.className = `card mb-2 ${isAttack ? 'border-danger' : ''}`;
+        
+        txElement.innerHTML = `
+            <div class="card-body p-3">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="mb-1">${tx.signature.substring(0, 12)}...</h6>
+                        <small class="text-muted">${new Date(tx.timestamp * 1000).toLocaleString()}</small>
+                    </div>
+                    <div class="text-end">
+                        ${tx.isDex ? `<span class="badge bg-primary">DEX: ${tx.direction || '?'}</span>` : '<span class="badge bg-secondary">TX</span>'}
+                        ${isAttack ? '<span class="badge bg-danger ms-1">Attack</span>' : ''}
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <a href="https://solscan.io/tx/${tx.signature}" target="_blank" 
+                       class="btn btn-sm btn-outline-primary me-2">
+                        View on Solscan
+                    </a>
+                    ${tx.isDex ? `<button class="btn btn-sm btn-outline-secondary analyze-btn" data-tx="${tx.signature}">
+                        Analyze
+                    </button>` : ''}
+                </div>
+            </div>
+        `;
+        
+        listElement.appendChild(txElement);
+    });
+    
+    // Add event listeners for analyze buttons
+    document.querySelectorAll('.analyze-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const signature = this.getAttribute('data-tx');
+            // You could implement detailed transaction analysis here
+            alert(`Detailed analysis for: ${signature}`);
+        });
+    });
+}
+    
+// Update your error handling
+function showError(message) {
+    // Remove any existing alerts
+    document.querySelectorAll('.alert-dismissible').forEach(el => el.remove());
+    
+    const alertBox = document.createElement('div');
+    alertBox.className = 'alert alert-danger alert-dismissible fade show';
+    alertBox.innerHTML = `
+        <strong>Error!</strong> ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    const form = document.getElementById('analysisForm');
+    form.prepend(alertBox);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        const bsAlert = new bootstrap.Alert(alertBox);
+        bsAlert.close();
+    }, 5000);
+}
+    
+    function toggleLoading(show) {
+        document.getElementById('analyzeText').classList.toggle('d-none', show);
+        document.getElementById('analyzeSpinner').classList.toggle('d-none', !show);
+        document.getElementById('analyzeBtn').disabled = show;
+        document.getElementById('loadingIndicator').classList.toggle('d-none', !show);
+        document.getElementById('resultsContainer').classList.toggle('d-none', show);
+    }</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+# Run the Streamlit application
+streamlit run app.py
+
+# Default token address for testing
+EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
