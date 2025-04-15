@@ -364,12 +364,15 @@ def analyze():
                 continue
                 
             processed_tx = {
-                "signature": signature,
-                "timestamp": tx.get("timestamp"),
-                "details": tx_details,
-                "isDex": is_dex_interaction(tx_details),
-                "direction": analyze_swap_direction(tx_details, token_address)
-            }
+    "signature": signature,
+    "timestamp": tx.get("timestamp"),
+    "details": tx_details,
+    "isDex": is_dex_interaction(tx_details),
+    "direction": analyze_swap_direction(tx_details, token_address),
+    "wallet": tx_details.get("signer", [None])[0],
+    "token": token_address
+}
+
             processed_transactions.append(processed_tx)
         
         # Detect sandwich patterns
@@ -379,6 +382,7 @@ def analyze():
             "status": "success",
             "tokenAddress": token_address,
             "transactions": processed_transactions,
+
             "potentialSandwiches": potential_sandwiches,
             "stats": {
                 "totalTransactions": len(transactions),
@@ -406,26 +410,27 @@ def detect_sandwich_patterns(transactions):
         if time_diff_prev > 30 or time_diff_next > 30:
             continue
             
-        # Check for attack patterns
-        if (prev_tx["direction"] == "buy" and 
-            curr_tx["direction"] == "buy" and 
-            next_tx["direction"] == "sell"):
-            
-            potential_sandwiches.append({
-                "type": "buy-victim-sell",
-                "transactions": [prev_tx, curr_tx, next_tx],
-                "timeDiffs": [time_diff_prev, time_diff_next]
-            })
-            
-        elif (prev_tx["direction"] == "sell" and 
-              curr_tx["direction"] == "sell" and 
-              next_tx["direction"] == "buy"):
-            
-            potential_sandwiches.append({
-                "type": "sell-victim-buy",
-                "transactions": [prev_tx, curr_tx, next_tx],
-                "timeDiffs": [time_diff_prev, time_diff_next]
-            })
+                # Require same wallet for front and back tx, different wallet for victim
+        if (prev_tx["wallet"] == next_tx["wallet"] and 
+            curr_tx["wallet"] != prev_tx["wallet"] and 
+            curr_tx["token"] == prev_tx["token"] == next_tx["token"]):
+
+            # Attacker front-runs (buy), victim trades (sell), attacker back-runs (sell)
+            if (prev_tx["direction"] == "buy" and curr_tx["direction"] == "sell" and next_tx["direction"] == "sell"):
+                potential_sandwiches.append({
+                    "type": "buy-victim-sell",
+                    "transactions": [prev_tx, curr_tx, next_tx],
+                    "timeDiffs": [time_diff_prev, time_diff_next]
+                })
+
+            # Attacker front-runs (sell), victim trades (buy), attacker back-runs (buy)
+            elif (prev_tx["direction"] == "sell" and curr_tx["direction"] == "buy" and next_tx["direction"] == "buy"):
+                potential_sandwiches.append({
+                    "type": "sell-victim-buy",
+                    "transactions": [prev_tx, curr_tx, next_tx],
+                    "timeDiffs": [time_diff_prev, time_diff_next]
+                })
+
     
     return potential_sandwiches
 
