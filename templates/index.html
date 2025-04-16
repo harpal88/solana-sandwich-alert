@@ -301,26 +301,29 @@ function is_dex_interaction(txDetails) {
 // Update your displayResults function
 function displayResults(data) {
     const resultsContainer = document.getElementById('resultsContainer');
+    const noResults = document.getElementById('noResults');
+    
     resultsContainer.classList.remove('d-none');
+    noResults.style.display = 'none';
     
     // Update stats
     document.getElementById('resultsCount').textContent = 
-        `${data.stats.totalTransactions} transactions analyzed`;
+        `${data.transactions.length} transactions analyzed`;
     
     // Show alerts based on results
     const successAlert = document.getElementById('successAlert');
     const attackAlert = document.getElementById('attackAlert');
     
-    if (data.stats.potentialAttacks > 0) {
+    if (data.potentialSandwiches && data.potentialSandwiches.length > 0) {
         successAlert.style.display = 'none';
         attackAlert.style.display = 'block';
         attackAlert.innerHTML = `
-            <strong>⚠️ ${data.stats.potentialAttacks} Potential Sandwich Attacks Detected!</strong>
+            <strong>⚠️ ${data.potentialSandwiches.length} Potential Sandwich Attacks Detected!</strong>
             <div class="mt-2">
                 ${data.potentialSandwiches.map(attack => `
                     <div class="mb-2">
                         <strong>${attack.type.replace('-', ' → ')}</strong><br>
-                        <small>Time between: ${attack.timeDiffs[0]}s and ${attack.timeDiffs[1]}s</small>
+                        <small>Time between: ${attack.timeDiffs[0].toFixed(2)}s and ${attack.timeDiffs[1].toFixed(2)}s</small>
                     </div>
                 `).join('')}
             </div>
@@ -329,75 +332,77 @@ function displayResults(data) {
         successAlert.style.display = 'block';
         attackAlert.style.display = 'none';
         document.getElementById('resultsSummary').textContent = 
-            `Analyzed ${data.stats.totalTransactions} transactions with ${data.stats.dexTransactions} DEX interactions.`;
+            `Analyzed ${data.transactions.length} transactions.`;
     }
     
-    // Update transaction list with enhanced visualization
-    updateTransactionList(data.transactions, data.potentialSandwiches);
+    // Update transaction list
+    updateTransactionList(data.transactions, data.potentialSandwiches || []);
 }
 
 function updateTransactionList(transactions, attacks) {
     const listElement = document.getElementById('transactionList');
     listElement.innerHTML = '';
     
-    if (!transactions.length) {
+    if (!transactions || transactions.length === 0) {
         listElement.innerHTML = '<div class="text-center py-3">No transactions found</div>';
         return;
     }
     
-    // Get all attack transaction signatures for highlighting
+    // Create set of attack signatures for quick lookup
     const attackSignatures = new Set();
     attacks.forEach(attack => {
-        attack.transactions.forEach(tx => attackSignatures.add(tx.signature));
+        if (attack.transactions) {
+            attack.transactions.forEach(tx => attackSignatures.add(tx.signature));
+        }
     });
     
     transactions.forEach(tx => {
         const isAttack = attackSignatures.has(tx.signature);
         const txElement = document.createElement('div');
-        txElement.className = `card mb-2 ${isAttack ? 'border-danger' : ''}`;
+        txElement.className = `card mb-2 transaction-card ${isAttack ? 'attack-transaction' : ''}`;
+        
+        const directionClass = tx.direction === 'buy' ? 'tx-direction-buy' : 
+                             tx.direction === 'sell' ? 'tx-direction-sell' : '';
         
         txElement.innerHTML = `
             <div class="card-body p-3">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
-                        <h6 class="mb-1">${tx.signature.substring(0, 12)}...</h6>
-                        <small class="text-muted">${new Date(tx.timestamp * 1000).toLocaleString()}</small>
+                        <h6 class="mb-1">
+                            <span class="${directionClass}">
+                                ${tx.signature ? tx.signature.substring(0, 12) + '...' : 'Unknown'}
+                            </span>
+                            ${isAttack ? '<span class="badge badge-attack ms-2">Attack</span>' : ''}
+                        </h6>
+                        <small class="text-muted">
+                            ${tx.timestamp ? new Date(tx.timestamp * 1000).toLocaleString() : 'Unknown time'}
+                        </small>
                     </div>
                     <div class="text-end">
-                        ${tx.isDex ? `<span class="badge bg-primary">DEX: ${tx.direction || '?'}</span>` : '<span class="badge bg-secondary">TX</span>'}
-                        ${isAttack ? '<span class="badge bg-danger ms-1">Attack</span>' : ''}
+                        ${tx.isDex ? 
+                            '<span class="badge bg-primary">DEX Transaction</span>' : 
+                            '<span class="badge bg-secondary">Regular Transaction</span>'
+                        }
                     </div>
                 </div>
-                <div class="mt-2">
-                    <a href="https://solscan.io/tx/${tx.signature}" target="_blank" 
-                       class="btn btn-sm btn-outline-primary me-2">
-                        View on Solscan
-                    </a>
-                    ${tx.isDex ? `<button class="btn btn-sm btn-outline-secondary analyze-btn" data-tx="${tx.signature}">
-                        Analyze
-                    </button>` : ''}
-                </div>
+                ${tx.signature ? `
+                    <div class="mt-2">
+                        <a href="https://solscan.io/tx/${tx.signature}" 
+                           target="_blank" 
+                           class="btn btn-sm btn-outline-primary">
+                            View on Solscan
+                        </a>
+                    </div>
+                ` : ''}
             </div>
         `;
         
         listElement.appendChild(txElement);
     });
-    
-    // Add event listeners for analyze buttons
-    document.querySelectorAll('.analyze-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const signature = this.getAttribute('data-tx');
-            // You could implement detailed transaction analysis here
-            alert(`Detailed analysis for: ${signature}`);
-        });
-    });
 }
     
 // Update your error handling
 function showError(message) {
-    // Remove any existing alerts
-    document.querySelectorAll('.alert-dismissible').forEach(el => el.remove());
-    
     const alertBox = document.createElement('div');
     alertBox.className = 'alert alert-danger alert-dismissible fade show';
     alertBox.innerHTML = `
@@ -408,7 +413,6 @@ function showError(message) {
     const form = document.getElementById('analysisForm');
     form.prepend(alertBox);
     
-    // Auto-dismiss after 5 seconds
     setTimeout(() => {
         const bsAlert = new bootstrap.Alert(alertBox);
         bsAlert.close();
@@ -421,6 +425,7 @@ function showError(message) {
         document.getElementById('analyzeBtn').disabled = show;
         document.getElementById('loadingIndicator').classList.toggle('d-none', !show);
         document.getElementById('resultsContainer').classList.toggle('d-none', show);
+        document.getElementById('noResults').style.display = show ? 'none' : 'block';
     }</script>
 </body>
 </html>
