@@ -44,7 +44,13 @@ class Config:
         return {
             "dex_programs": [
                 "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin",  # Serum
-                "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"   # Raydium
+                "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8" ,  # Raydium
+       
+        "E5ndSkaFFpVRYokXdPGAAdeddnsseAEgMDWCx1yyiVrL",
+        "9W959DqEETiGZocYWCQPaJ6sBmUzgfxXfqGeTEdp3aQP", 
+        "SSwpkEEcbUqx4vtoEByFjSkhKdCT862DNVb52nZg1UZ",
+        "9qvG1zUp8xF1Bi4m6UdRNby1BAAuaDrUxSpv4CmRRMjL", 
+        "22Y43yTVxuUkoRKdm9thyRhQ3SdgQS7c7kB6UNCiaczD"                 
             ],
             "frontend": {
                 "static_folder": "static",
